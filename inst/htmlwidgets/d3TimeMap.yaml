@@ -1,0 +1,8 @@
+dependencies:
+  - name: d3
+    version: 3.5.6
+    src: htmlwidgets/lib
+    script:
+      - d3-3.5.6.min.js
+      - d3-legend.min.js
+    stylesheet: d3TimeMap.css
