@@ -2,102 +2,68 @@ function d3TimeMap() {
 
     var width = 600, // default width
     height = 600, // default height
-    dims = {},
-    margin = {top: 20, right: 20, bottom: 20, left: 40, legend_top: 50},
-    settings = {},
-    data = [],
-    x, y, lx, bx, color_scale, symbol_scale, size_scale,
-    min_x, min_y, max_x, max_y, gap_x, gap_y,
+    margin = {top: 20, right: 20, bottom: 30, left: 40},
+    settings = {}, legend_x, min_x, min_y, max_x, max_y, gap, legend, legendNew,
+    data = [], x, y, lx, bx, color_scale,
     xAxis, yAxis,
-    svg,
-    zeroline;
+    svg;
 
+    function set_options(){
+      width = width - margin.left - margin.right;
+      height = height - margin.top - margin.bottom;
 
+      legend_x = width + margin.left + 24;
 
-    function setup_sizes() {
+      // define x,y, and scales
+        min_x = d3.min(data, function(d) { return(d.x);} );
+        min_y = d3.min(data, function(d) { return(d.y);} );
+        max_x = d3.max(data, function(d) { return(d.x);} );
+        max_y = d3.max(data, function(d) { return(d.y);} );
+        gap = (max_x - min_x) * 0.005;
 
-        dims.legend_width = 0;
-        if (settings.has_legend) dims.legend_width = settings.legend_width;
+        x = d3.scale.linear()
+            .range([0, width]);
+        if (settings.xlim) x.domain(settings.xlim);
+        else x.domain([min_x-gap, max_x+gap]).nice();
 
-        dims.width = width - dims.legend_width;
-        dims.height = height;
-        dims.height = dims.height - margin.top - margin.bottom;
-        dims.width = dims.width - margin.left - margin.right;
+        y = d3.scale.linear()
+            .range([height, 0]);
+        if (settings.ylim) y.domain(settings.ylim);
+        else y.domain([min_y-gap, max_y+gap]).nice();
 
-        // Fixed ratio
-        if (settings.fixed) {
-            dims.height = Math.min(dims.height, dims.width);
-            dims.width = dims.height;
-        }
-
-        dims.total_width = dims.width + margin.left + margin.right + dims.legend_width;
-        dims.total_height = dims.height + margin.top + margin.bottom;
-
-        dims.legend_x = dims.total_width - margin.right - dims.legend_width + 24;
-    }
-
-    function setup_scales() {
-
-        // x and y limits
-        if (settings.xlim === null) {
-            min_x = d3.min(data, function(d) { return(d.x);} );
-            max_x = d3.max(data, function(d) { return(d.x);} );
-            gap_x = (max_x - min_x) * 0.2;
-        } else {
-            min_x = settings.xlim[0];
-            max_x = settings.xlim[1];
-            gap_x = 0;
-        }
-        if (settings.ylim === null) {
-            min_y = d3.min(data, function(d) { return(d.y);} );
-            max_y = d3.max(data, function(d) { return(d.y);} );
-            gap_y = (max_y - min_y) * 0.2;
-        } else {
-            min_y = settings.ylim[0];
-            max_y = settings.ylim[1];
-            gap_y = 0;
-        }
-
-        // Fixed ratio
-        if (settings.fixed) {
-            min_x = min_y = Math.min(min_x, min_y);
-            max_x = max_y = Math.max(max_x, max_y);
-            gap_x = gap_y = Math.max(gap_x, gap_y);
-        }
-
-        // x, y, color, symbol and size scales
-        x = d3.scale.linear().range([0, dims.width]);
-        y = d3.scale.linear().range([dims.height, 0]);
-        x.domain([min_x - gap_x, max_x + gap_x]);
-        y.domain([min_y - gap_y, max_y + gap_y]);
         lx = d3.min(data, function(d) { return(d.col_var);});
         bx = d3.max(data, function(d) { return(d.col_var);});
         if(typeof(lx) === "number"){
-        color_scale = d3.scale.quantile().domain([lx,bx]).range(settings.colors);}
+          color_scale = d3.scale.quantile().domain([lx,bx]).range(settings.colors);}
         else{color_scale = d3.scale.ordinal().range(settings.colors);}
-        symbol_scale = d3.scale.ordinal().range(d3.range(d3.svg.symbolTypes.length));
-        size_scale = d3.scale.linear()
-        .range(settings.size_range)
-        .domain([d3.min(data, function(d) { return(d.size_var);} ),
-                 d3.max(data, function(d) { return(d.size_var);} )]);
+
+
 
         brush = d3.svg.brush()
-        .x(x)
-        .y(y)
-        .on("brush", function() {brushmove();})
-        .on("brushend", function() {brushend();});
+          .x(x)
+          .y(y)
+          .on("brush", function() {brushmove();})
+          .on("brushend", function() {brushend();});
 
         // x and y axis functions
         xAxis = d3.svg.axis()
-        .scale(x)
-        .orient("bottom")
-        .tickSize(-dims.height);
+                .scale(x)
+                .orient("bottom")
+                .tickSize(-height)
+                .tickFormat(function (d) {
+                  if (d < 0) return ''; // No negative labels
+                  else return d;});
+
         yAxis = d3.svg.axis()
-        .scale(y)
-        .orient("left")
-        .tickSize(-dims.width);
+                .scale(y)
+                .orient("left")
+                .tickSize(-width)
+                .tickFormat(function (d) {
+                  if (d < 0) return ''; // No negative labels
+                  else return d;});
 
     }
+
 
 
     // Key function to identify rows when interactively filtering
@@ -148,48 +114,36 @@ function d3TimeMap() {
       function reset_axis() {
       svg.select(".x.axis").call(xAxis);
       svg.select(".y.axis").call(yAxis);
-      var zeroline = d3.svg.line()
-        .x(function(d) {return x(d.x)})
-        .y(function(d) {return y(d.y)});
-        svg.select(".zeroline.hline").attr("d", zeroline([{x:x.domain()[0], y:0}, {x:x.domain()[1], y:0}]));
-        svg.select(".zeroline.vline").attr("d", zeroline([{x:0, y:y.domain()[0]}, {x:0, y:y.domain()[1]}]));
       }
 
 
     // Create and draw x and y axes
     function add_axes(selection) {
 
-        // x axis
-        selection.append("g")
-        .attr("class", "x axis")
-        .attr("transform", "translate(0," + dims.height + ")")
-        .call(xAxis)
-        .append("text")
-        .attr("class", "axis-label")
-        .attr("x", dims.width - 5)
-        .attr("y", -6)
-        .style("text-anchor", "end")
-        .text(settings.xlab);
+                selection.append("g")
+                    .attr("class", "x axis")
+                    .attr("transform", "translate(0," + height + ")")
+                    .call(xAxis)
+                    .append("text")
+                      .attr("class", "axis-label")
+                      .attr("y", -6)
+                      .style("text-anchor", "end")
+                      .attr("x", width)
+                      .text(settings.xlab);
 
-        // y axis
-        selection.append("g")
-        .attr("class", "y axis")
-        .call(yAxis)
-        .append("text")
-        .attr("class", "axis-label")
-        .attr("transform", "rotate(-90)")
-        .attr("x", -5)
-        .attr("y", 6)
-        .attr("dy", ".71em")
-        .style("text-anchor", "end")
-        .text(settings.ylab);
+              selection.append("g")
+                    .attr("class", "y axis")
+                    .call(yAxis)
+                    .append("text")
+                    .attr("class", "axis-label")
+                    .attr("transform", "rotate(-90)")
+                    .attr("y", 6)
+                    .attr("dy", ".71em")
+                    .style("text-anchor", "end")
+                    .text(settings.ylab);
 
     }
 
-    // Zero horizontal and vertical lines
-    zeroline = d3.svg.line()
-    .x(function(d) {return x(d.x)})
-    .y(function(d) {return y(d.y)});
 
     // Create tooltip content function
     function tooltip_content(d) {
@@ -205,8 +159,6 @@ function d3TimeMap() {
             text.push("<b>"+settings.xlab+":</b> "+d.x.toFixed(3));
             text.push("<b>"+settings.ylab+":</b> "+d.y.toFixed(3));
             if (settings.has_color_var) text.push("<b>"+settings.col_lab+":</b> "+d.col_var);
-            if (settings.has_symbol_var) text.push("<b>"+settings.symbol_lab+":</b> "+d.symbol_var);
-            if (settings.has_size_var) text.push("<b>"+settings.size_lab+":</b> "+d.size_var);
             return text.join("<br />");
         }
     }
@@ -236,17 +188,12 @@ function d3TimeMap() {
         .style("opacity", settings.point_opacity)
         // fill color
         .style("fill", function(d) { return color_scale(d.col_var); })
-        // symbol and size
         .attr("d", d3.svg.symbol()
-            .type(function(d) {return d3.svg.symbolTypes[symbol_scale(d.symbol_var)]})
-            .size(function(d) {
-                if (settings.has_size_var) { return size_scale(d.size_var)}
-                else { return settings.point_size }
-            })
+            .size(function(d) {return settings.point_size;})
         )
         .attr("class", function(d,i) {
-          return "dot symbol symbol-c" + d.symbol_var + " color color-c" + d.col_var;
-        })
+          return "dot color color-c" + d.col_var;
+        });
     }
 
 
@@ -266,7 +213,7 @@ function d3TimeMap() {
         selection
         .text(function(d) {return(d.lab)})
         .style("font-size", settings.labels_size + "px")
-        .attr("class", function(d,i) { return "point-label color color-c" + d.col_var + " symbol symbol-c" + d.symbol_var; })
+        .attr("class", function(d,i) { return "point-label color color-c" + d.col_var; })
         .attr("transform", translation)
         .style("fill", function(d) { return color_scale(d.col_var); })
         .attr("dx", function(d) {
@@ -281,147 +228,36 @@ function d3TimeMap() {
     }
 
 
-    // Format legend label
-    function legend_label_formatting (selection, margin_top) {
-        selection
-        .style("text-anchor", "beginning")
-        .style("fill", "#000")
-        .style("font-weight", "bold");
+    // Create legend
+    function add_legend() {
+
+        legend = svg.select(".legend")
+                    .data(color_scale.domain().sort());
+
+        legendNew = legend.enter().append("g")
+                        .attr("class", "legend")
+                        .attr("transform", function(d, i) { return "translate(0," + i * 20 + ")"; })
+                        .append("rect")
+                        .attr("x", width - 18)
+                        .attr("width", 18)
+                        .attr("height", 18)
+                        .append("text")
+                        .attr("x", width - 24)
+                        .attr("y", 9)
+                        .attr("dy", ".35em")
+                        .style("text-anchor", "end");
+
+            legend.exit().remove();
+
+            legend.selectAll("rect")
+                  .attr("x", width - 18)
+                  .style("fill", color);
+            legend.selectAll("text")
+                  .attr("x", width - 24)
+                  .text(function(d) { return d; });
     }
 
-    // Create color legend
-    function add_color_legend() {
 
-        var legend = svg.select(".legend");
-
-        var legend_color_domain = color_scale.domain().sort();
-        var legend_color_scale = d3.scale.category10();
-
-        legend_color_scale
-        .domain(legend_color_domain)
-        .range(legend_color_domain.map(function(d) {return color_scale(d)}));
-
-        var color_legend = d3.legend.color()
-        .shapePadding(3)
-        .shape("rect")
-        .scale(legend_color_scale)
-        .on("cellover", function(d) {
-            var nsel = ".color:not(.color-c" + d + ")";
-            var sel = ".color-c" + d;
-            svg.selectAll(nsel)
-            .transition()
-            .style("opacity", 0.2);
-            svg.selectAll(sel)
-            .transition()
-            .style("opacity", 1);
-        })
-        .on("cellout", function(d) {
-            var sel = ".color";
-            svg.selectAll(sel)
-            .transition()
-            .style("opacity", settings.point_opacity);
-            svg.selectAll(".point-label")
-            .transition()
-            .style("opacity", 1);
-        });
-
-        legend.append("g")
-        .append("text")
-        .attr("class", "color-legend-label")
-        .attr("transform", "translate(" + dims.legend_x + "," + margin.legend_top + ")")
-        .text(settings.col_lab)
-        .call(legend_label_formatting);
-
-        legend.append("g")
-        .attr("class", "color-legend")
-        .attr("transform", "translate(" + dims.legend_x + "," + (margin.legend_top + 8) + ")")
-        .call(color_legend);
-    }
-
-    // Create symbol legend
-    function add_symbol_legend() {
-
-        var legend = svg.select(".legend");
-
-        // Height of color legend
-        var color_legend_height = settings.has_color_var ? color_scale.domain().length * 20 + 30 : 0;
-        margin.symbol_legend_top = color_legend_height + margin.legend_top;
-
-        var legend_symbol_domain = symbol_scale.domain().sort();
-        var legend_symbol_scale = d3.scale.ordinal()
-        .domain(legend_symbol_domain)
-        .range(legend_symbol_domain.map(function(d) {return d3.svg.symbol().type(d3.svg.symbolTypes[symbol_scale(d)])()}));
-
-        var symbol_legend = d3.legend.symbol()
-        .shapePadding(5)
-        .scale(legend_symbol_scale)
-        .on("cellover", function(d) {
-            var nsel = ".symbol:not(.symbol-c" + d + ")";
-            var sel = ".symbol-c" + d;
-            svg.selectAll(nsel)
-            .transition()
-            .style("opacity", 0.2);
-            svg.selectAll(sel)
-            .transition()
-            .style("opacity", 1);
-        })
-        .on("cellout", function(d) {
-            var sel = ".symbol";
-            svg.selectAll(sel)
-            .transition()
-            .style("opacity", settings.point_opacity);
-            svg.selectAll(".point-label")
-            .transition()
-            .style("opacity", 1);
-        });
-
-        legend.append("g")
-        .append("text")
-        .attr("class", "symbol-legend-label")
-        .attr("transform", "translate(" + dims.legend_x + "," + margin.symbol_legend_top + ")")
-        .text(settings.symbol_lab)
-        .call(legend_label_formatting);
-
-        legend.append("g")
-        .attr("class", "symbol-legend")
-        .attr("transform", "translate(" + (dims.legend_x + 8) + "," + (margin.symbol_legend_top + 14) + ")")
-        .call(symbol_legend);
-
-    }
-
-    // Create size legend
-    function add_size_legend() {
-
-        var legend = svg.select(".legend");
-
-        // Height of color and symbol legends
-        var color_legend_height = settings.has_color_var ? color_scale.domain().length * 20 + 30 : 0;
-        var symbol_legend_height = settings.has_symbol_var ? symbol_scale.domain().length * 20 + 30 : 0;
-        margin.size_legend_top = color_legend_height + symbol_legend_height + margin.legend_top;
-
-        var legend_size_scale = d3.scale.linear()
-        .domain(size_scale.domain())
-        // FIXME : find exact formula
-        .range(size_scale.range().map(function(d) {return Math.sqrt(d)/1.8}));
-
-        var size_legend = d3.legend.size()
-        .shapePadding(3)
-        .shape('circle')
-        .scale(legend_size_scale);
-
-        legend.append("g")
-        .append("text")
-        .attr("class", "size-legend-label")
-        .attr("transform", "translate(" + dims.legend_x + "," + margin.size_legend_top + ")")
-        .text(settings.size_lab)
-        .call(legend_label_formatting);
-
-        legend.append("g")
-        .attr("class", "size-legend")
-        .attr("transform", "translate(" + (dims.legend_x + 8) + "," + (margin.size_legend_top + 14) + ")")
-        .call(size_legend);
-
-    }
 
     // Filter points data
     function point_filter(d) {
@@ -432,8 +268,7 @@ function d3TimeMap() {
     function chart(selection) {
         selection.each(function() {
 
-            setup_sizes();
-            setup_scales();
+            set_options();
 
             // Root chart element and axes
             root = svg.append("g")
@@ -449,14 +284,14 @@ function d3TimeMap() {
             .attr('id', 'scatterclip-' + settings.html_id)
             .append('rect')
             .attr('class', 'cliprect')
-            .attr('width', dims.width)
-            .attr('height', dims.height);
+            .attr('width', width)
+            .attr('height', height);
 
             // Brush
             root.append("g")
               .attr("class", "pane")
-              .attr("width", dims.width)
-              .attr("height", dims.height)
+              .attr("width", width)
+              .attr("height", height)
               .style("fill-opacity", ".125")
               .style("pointer-events", "all")
               .call(brush);
@@ -464,16 +299,10 @@ function d3TimeMap() {
             // chart body
             var chart_body = root.append("g")
             .attr("class", "chart-body")
-            .attr("width", dims.width)
-            .attr("height", dims.height)
+            .attr("width", width)
+            .attr("height", height)
             .attr("clip-path", "url(" + document.location.href + "#scatterclip-" + settings.html_id + ")");
 
-             chart_body.append("path")
-            .attr("class", "zeroline hline")
-            .attr("d", zeroline([{x:x.domain()[0], y:0}, {x:x.domain()[1], y:0}]));
-            chart_body.append("path")
-            .attr("class", "zeroline vline")
-            .attr("d", zeroline([{x:0, y:y.domain()[0]}, {x:0, y:y.domain()[1]}]));
 
             // Add points
             var dot = chart_body
@@ -510,16 +339,9 @@ function d3TimeMap() {
                 var legend = svg.append("g").attr("class", "legend");
                 // Color legend
                 if (settings.has_color_var) {
-                    add_color_legend.svg = svg;
-                    add_color_legend(legend);
+                    add_legend.svg = svg;
+                    add_legend(legend);
                 }
-                // Symbol legend
-                if (settings.has_symbol_var) {
-                    add_symbol_legend.svg = svg;
-                    add_symbol_legend(legend);
-                }
-                // Size legend
-                if (settings.has_size_var) add_size_legend(legend);
             }
 
         });
@@ -549,7 +371,7 @@ function d3TimeMap() {
                 .call(label_formatting);
             }
         }
-    };
+    }
 
     // Update data with transitions
     function update_data() {
@@ -557,16 +379,15 @@ function d3TimeMap() {
       if (settings.has_legend_changed && settings.legend_width > 0)
             resize_chart();
 
-      setup_sizes();
-      setup_scales();
+      set_options();
 
       var t0 = svg.transition().duration(1000);
       svg.select(".x.axis .axis-label").text(settings.xlab);
       t0.select(".x.axis").call(xAxis);
-      t0.select(".zeroline.vline").attr("d", zeroline([{x:0, y:y.domain()[0]}, {x:0, y:y.domain()[1]}]));
       svg.select(".y.axis .axis-label").text(settings.ylab);
       t0.select(".y.axis").call(yAxis);
-      t0.select(".zeroline.hline").attr("d", zeroline([{x:x.domain()[0], y:0}, {x:x.domain()[1], y:0}]));
+
+
       svg.select(".pane");
 
       var chart_body = svg.select(".chart-body");
@@ -596,14 +417,9 @@ function d3TimeMap() {
           if (settings.has_legend && settings.legend_width > 0) {
               // Color legend
               if (settings.has_color_var) {
-                add_color_legend(legend);
+                add_legend(legend);
               }
-              // Symbol legend
-              if (settings.has_symbol_var) {
-                add_symbol_legend(legend);
-              }
-              // Size legend
-              if (settings.has_size_var) add_size_legend(legend);
+
           }
       }
     };
@@ -611,47 +427,30 @@ function d3TimeMap() {
 
     // Dynamically resize chart elements
     function resize_chart () {
-        // recompute sizes
-        setup_sizes();
+        set_options();
         // Change svg attributes
-        svg.select(".root").attr("width", dims.width).attr("height", dims.height);
-        svg.select(".cliprect").attr("width", dims.width).attr("height", dims.height);
-        svg.select(".pane").attr("width", dims.width).attr("height", dims.height);
-        svg.select(".chart-body").attr("width", dims.width).attr("height", dims.height);
-        svg.select(".x.axis").attr("transform", "translate(0," + dims.height + ")").call(xAxis);
-        svg.select(".x.axis .axis-label").attr("x", dims.width - 5);
-        svg.select(".y.axis").call(yAxis);;
+        svg.select(".root").attr("width", width).attr("height", height);
+        svg.select(".cliprect").attr("width", width).attr("height", height);
+        svg.select(".pane").attr("width", width).attr("height", height);
+        svg.select(".chart-body").attr("width", width).attr("height", height);
+        svg.select(".x.axis").attr("transform", "translate(0," + height + ")").call(xAxis);
+        svg.select(".x.axis .axis-label").attr("x", width - 5);
+        svg.select(".y.axis").call(yAxis);
 
         svg.selectAll(".dot").attr("transform", translation);
         if (settings.has_labels) {
             svg.selectAll(".point-label")
             .attr("transform", translation);
         }
-        // Move zerolines
-        var zeroline = d3.svg.line()
-        .x(function(d) {return x(d.x)})
-        .y(function(d) {return y(d.y)});
-        svg.select(".zeroline.hline").attr("d", zeroline([{x:x.domain()[0], y:0}, {x:x.domain()[1], y:0}]));
-        svg.select(".zeroline.vline").attr("d", zeroline([{x:0, y:y.domain()[0]}, {x:0, y:y.domain()[1]}]));
+
         // Move legends
         if (settings.has_color_var) {
             svg.select(".color-legend-label")
-            .attr("transform", "translate(" + dims.legend_x + "," + margin.legend_top + ")");
+            .attr("transform", "translate(" + legend_x + "," + margin.legend_top + ")");
             svg.select(".color-legend")
-            .attr("transform", "translate(" + dims.legend_x + "," + (margin.legend_top + 12) + ")");
+            .attr("transform", "translate(" + legend_x + "," + (margin.legend_top + 12) + ")");
         }
-        if (settings.has_symbol_var) {
-            svg.select(".symbol-legend-label")
-            .attr("transform", "translate(" + dims.legend_x + "," + margin.symbol_legend_top + ")");
-            svg.select(".symbol-legend")
-            .attr("transform", "translate(" + (dims.legend_x + 8) + "," + (margin.symbol_legend_top + 14) + ")");
-        }
-        if (settings.has_size_var) {
-            svg.select(".size-legend-label")
-            .attr("transform", "translate(" + dims.legend_x + "," + margin.size_legend_top + ")");
-            svg.select(".size-legend")
-            .attr("transform", "translate(" + (dims.legend_x + 8) + "," + (margin.size_legend_top + 14) + ")");
-        }
+
 
 
     };
@@ -664,8 +463,8 @@ function d3TimeMap() {
         // Brush reset
         d3.select("#" + settings.dom_id_reset_brush).on("click", function() {
             d3.transition().duration(750).tween("brush", function() {
-                var ix = d3.interpolate(x.domain(), [min_x - gap_x, max_x + gap_x]),
-                iy = d3.interpolate(y.domain(), [min_y - gap_y, max_y + gap_y]);
+                var ix = d3.interpolate(x.domain(), [0, width]),
+                iy = d3.interpolate(y.domain(), [height, 0]);
                 return function(t) {
                     brush.x(x.domain(ix(t))).y(y.domain(iy(t)));
                     reset_brush();
@@ -707,9 +506,7 @@ function d3TimeMap() {
         if (!arguments.length) return settings;
         if (Object.keys(settings).length === 0) {
             settings = value;
-            // update dims and scales
-            setup_sizes();
-            setup_scales();
+            set_options();
         } else {
             var old_settings = settings;
             settings = value;
@@ -763,8 +560,7 @@ HTMLWidgets.widget({
         .text(".d3TimeMap {font: 10px sans-serif;}" +
         ".d3TimeMap .axis line, .axis path { stroke: #000; fill: none; shape-rendering: CrispEdges;} " +
         ".d3TimeMap .axis .tick line { stroke: #ddd;} " +
-        ".d3TimeMap .axis text { fill: #000; } " +
-        ".d3TimeMap .zeroline { stroke-width: 1; stroke: #444; stroke-dasharray: 5,5;} ");
+        ".d3TimeMap .axis text { fill: #000; } ");
 
         // Create tooltip content div
         var tooltip = d3.select(".d3TimeMap-tooltip");
@@ -828,7 +624,7 @@ HTMLWidgets.widget({
             obj.settings.x_changed = changed("x");
             obj.settings.y_changed = changed("y");
             obj.settings.lab_changed = changed("lab");
-            obj.settings.legend_changed = changed("col_var") || changed("symbol_var") || changed("size_var");
+            obj.settings.legend_changed = changed("col_var");
             obj.settings.data_changed = obj.settings.x_changed || obj.settings.y_changed || obj.settings.lab_changed ||
                                         obj.settings.legend_changed || obj.settings.has_labels_changed;
             scatter = scatter.settings(obj.settings);
