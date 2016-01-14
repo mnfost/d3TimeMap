@@ -14,6 +14,10 @@ To install:
 if (!require("devtools")) install.packages("devtools")
 devtools::install_github("mnfost/d3TimeMap")
 ```
+## Usage
+
+![d3TimeMap-example](https://github.com/mnfost/d3TimeMap/blob/master/inst/d3TimeMap-example.gif)
+
 
 ## Credits
 
